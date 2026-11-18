@@ -2,6 +2,8 @@ using Dalamud.Utility;
 using Flurl.Http;
 using System;
 using System.Collections.Generic;
+using System.Net.Http;
+using System.Text;
 using System.Threading.Tasks;
 using static FFXIVClientStructs.FFXIV.Client.System.Scheduler.Clip.BaseClip.Delegates;
 
@@ -28,12 +30,10 @@ public class NtfyDelivery : IDelivery
             request = request.AppendPathSegment(Plugin.Configuration.NtfyTopic);
         if (!Plugin.Configuration.NtfyToken.IsNullOrWhitespace())
             request = request.WithOAuthBearerToken(Plugin.Configuration.NtfyToken);
-
+        var args = string.IsNullOrEmpty(title) ? text : $"{title}: {text}";
         try
         {
-            request = request.AppendPathSegment("publish");
-            request.AppendQueryParam("message",$"{title}:{text}");
-            await request.GetStringAsync();
+            await request.PostAsync(new StringContent(args, Encoding.UTF8, "text/plain"));
             Service.PluginLog.Debug("Sent Ntfy message");
         }
         catch (FlurlHttpException e)
