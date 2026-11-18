@@ -39,6 +39,7 @@ public class NtfyDelivery : IDelivery
         catch (FlurlHttpException e)
         {
             Service.PluginLog.Error($"Failed to make Ntfy request: '{e.Message}'");
+            if(e.StatusCode == 429) { Service.PluginLog.Error($"Retry-After: {e.Call?.Response?.Headers.FirstOrDefault("Retry-After")}"); }
             Service.PluginLog.Error($"{e.StackTrace}");
         }
         catch (ArgumentException e)
