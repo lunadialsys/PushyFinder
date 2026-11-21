@@ -1,8 +1,11 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using Dalamud.Utility;
 using Flurl.Http;
+using System;
+using System.Collections.Generic;
+using System.Net.Http;
+using System.Text;
+using System.Threading.Tasks;
+using static FFXIVClientStructs.FFXIV.Client.System.Scheduler.Clip.BaseClip.Delegates;
 
 namespace PushyFinder.Delivery;
 
@@ -22,21 +25,21 @@ public class NtfyDelivery : IDelivery
         // Assuming `title` is used as the main message
         // Since ntfy doesn't have a separate title field, you can prepend it to the message or just send the message
         var args = string.IsNullOrEmpty(title) ? text : $"{title}: {text}";
-       
         IFlurlRequest request = new FlurlRequest(Plugin.Configuration.NtfyServer);
         if (!Plugin.Configuration.NtfyTopic.IsNullOrWhitespace())
             request = request.AppendPathSegment(Plugin.Configuration.NtfyTopic);
         if (!Plugin.Configuration.NtfyToken.IsNullOrWhitespace())
             request = request.WithOAuthBearerToken(Plugin.Configuration.NtfyToken);
-
+        
         try
         {
-            await request.PostJsonAsync(args);
+            await request.PostAsync(new StringContent(args, Encoding.UTF8, "text/plain"));
             Service.PluginLog.Debug("Sent Ntfy message");
         }
         catch (FlurlHttpException e)
         {
             Service.PluginLog.Error($"Failed to make Ntfy request: '{e.Message}'");
+            if(e.StatusCode == 429) { Service.PluginLog.Error($"Retry-After: {e.Call?.Response?.Headers.FirstOrDefault("Retry-After")}"); }
             Service.PluginLog.Error($"{e.StackTrace}");
         }
         catch (ArgumentException e)

@@ -25,14 +25,14 @@ public static class PartyListener
 
         var jobAbbr = LuminaDataUtil.GetJobAbbreviation(m.JobId);
 
-        if (m.PartyCount == 8)
+        if ((!m.IsAlliance && m.PartyCount == 8) || (m.IsAlliance && m.PartyCount == 24))
         {
             MasterDelivery.Deliver("Party full",
-                                   $"{m.Name} (Lv{m.Level} {jobAbbr}) joins the party.\nParty recruitment ended. All spots have been filled.");
+                                   $"{m.Name} (Lv{m.Level} {jobAbbr}) joins the party.\n{(m.IsAlliance ? "Alliance" : "Party")} recruitment ended. All spots have been filled.");
         }
         else
         {
-            MasterDelivery.Deliver($"{m.PartyCount}/8: Party join",
+            MasterDelivery.Deliver($"{m.PartyCount}/{(m.IsAlliance ? 24 : 8)}: Party join",
                                    $"{m.Name} (Lv{m.Level} {jobAbbr}) joins the party.");
         }
     }
@@ -43,7 +43,7 @@ public static class PartyListener
 
         var jobAbbr = LuminaDataUtil.GetJobAbbreviation(m.JobId);
 
-        MasterDelivery.Deliver($"{m.PartyCount - 1}/8: Party leave",
+        MasterDelivery.Deliver($"{m.PartyCount - 1}/{(m.IsAlliance ? 24 : 8)}: Party leave",
                                $"{m.Name} (Lv{m.Level} {jobAbbr}) has left the party.");
     }
 }

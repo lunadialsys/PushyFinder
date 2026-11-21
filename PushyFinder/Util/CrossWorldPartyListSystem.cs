@@ -29,7 +29,7 @@ public static class CrossWorldPartyListSystem
     }
 
     private static bool ListContainsMember(List<CrossWorldMember> l, CrossWorldMember m)
-        => l.Any(a => a.Name == m.Name);
+        => l.Any(a => a.ContentId == m.ContentId);
 
     private static unsafe void Update(IFramework framework)
     {
@@ -40,39 +40,48 @@ public static class CrossWorldPartyListSystem
             return;
 
         members.Clear();
-        var partyCount = InfoProxyCrossRealm.GetPartyMemberCount();
-        for (var i = 0u; i < partyCount; i++)
+
+        // CrossRealmGroups contains the separate groups of an alliance. The
+        // old default GetGroupMember call only returned the local 8-person group.
+        var proxy = InfoProxyCrossRealm.Instance();
+        var groupCount = proxy == null ? 1 : proxy->GroupCount;
+        groupCount = (byte)System.Math.Clamp(groupCount, 1, 6);
+        var isAlliance = groupCount > 1;
+
+        var partyCount = 0;
+        for (var group = 0; group < groupCount; group++)
+            partyCount += InfoProxyCrossRealm.GetGroupMemberCount(group);
+
+        for (var group = 0; group < groupCount; group++)
         {
-            var addr = InfoProxyCrossRealm.GetGroupMember(i);
-            var name = addr->NameString;
-            var mObj = new CrossWorldMember
+            var groupMemberCount = InfoProxyCrossRealm.GetGroupMemberCount(group);
+            for (var i = 0u; i < groupMemberCount; i++)
             {
-                Name = name,
-                PartyCount = partyCount,
-                Level = addr->Level,
-                JobId = addr->ClassJobId
-            };
-            members.Add(mObj);
+                var addr = InfoProxyCrossRealm.GetGroupMember(i, group);
+                if (addr == null || addr->ContentId == 0)
+                    continue;
+
+                members.Add(new CrossWorldMember
+                {
+                    ContentId = addr->ContentId,
+                    Name = addr->NameString,
+                    PartyCount = partyCount,
+                    IsAlliance = isAlliance,
+                    Level = addr->Level,
+                    JobId = addr->ClassJobId
+                });
+            }
         }
 
-        if (members.Count != oldMembers.Count)
-        {
-            // Check for joins
-            foreach (var i in members)
-                if (!ListContainsMember(oldMembers, i))
-                {
-                    // member joined
-                    OnJoin?.Invoke(i);
-                }
+        // Compare the snapshots even when their counts match; an outgoing and
+        // incoming member can be observed in the same update.
+        foreach (var i in members)
+            if (!ListContainsMember(oldMembers, i))
+                OnJoin?.Invoke(i);
 
-            // Check for leaves
-            foreach (var i in oldMembers)
-                if (!ListContainsMember(members, i))
-                {
-                    // member left
-                    OnLeave?.Invoke(i);
-                }
-        }
+        foreach (var i in oldMembers)
+            if (!ListContainsMember(members, i))
+                OnLeave?.Invoke(i);
         
         // Fix potential broken references caused by memory semantics
         oldMembers = members.ToList();
@@ -80,8 +89,10 @@ public static class CrossWorldPartyListSystem
 
     public struct CrossWorldMember
     {
+        public ulong ContentId;
         public string Name;
         public int PartyCount;
+        public bool IsAlliance;
         public uint Level;
         public uint JobId;
     }
